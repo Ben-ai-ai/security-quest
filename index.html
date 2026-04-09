@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Security Quest — Site Security Procedures Game</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="wrap">
+      <h1>Security Quest</h1>
+      <p class="tag">Play through six levels to master Site Security Procedures — earn points, badges, and the Security Champion title.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="lobby" class="card center">
+      <h2>Welcome, Agent</h2>
+      <p>Choose a level to begin. Complete mini-games to earn points and unlock the final challenge.</p>
+      <div id="levels" class="levels">
+        <!-- Level buttons injected by JS -->
+      </div>
+      <div class="status">
+        <span id="score">Score: 0</span>
+        <span id="levelBadge">Badge: None</span>
+      </div>
+      <div class="controls">
+        <button id="startAll" class="btn">Start Level 1</button>
+        <button id="resetGame" class="btn ghost">Reset Game</button>
+      </div>
+    </section>
+
+    <section id="gameArea" class="card hidden">
+      <div class="gameHeader">
+        <h2 id="levelTitle">Level</h2>
+        <div class="timerWrap">
+          <span id="timer">Time: 00:00</span>
+          <span id="levelPoints">Level Points: 0</span>
+        </div>
+      </div>
+
+      <div id="levelContent" class="levelContent">
+        <!-- Level content injected by JS -->
+      </div>
+
+      <div class="gameFooter">
+        <button id="nextLevel" class="btn" disabled>Next Level</button>
+        <button id="backToLobby" class="btn ghost">Back to Lobby</button>
+      </div>
+    </section>
+
+    <section id="final" class="card hidden">
+      <h2>Final Score</h2>
+      <p id="finalText"></p>
+      <div id="badges" class="badges"></div>
+      <button id="playAgain" class="btn">Play Again</button>
+    </section>
+
+    <section id="howto" class="card">
+      <h2>How to Play</h2>
+      <ol>
+        <li>Complete each level’s mini-game within the time limit to earn points.</li>
+        <li>Correct answers and quick completion give bonus points.</li>
+        <li>Collect badges for perfect rounds; reach 300+ points to become Security Champion.</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p>Security Quest — interactive training for Site Security Procedures</p>
+    </div>
+  </footer>
+
+  <template id="levelButtonTpl">
+    <button class="levelBtn"></button>
+  </template>
+
+  <script src="script.js"></script>
+</body>
+</html>
