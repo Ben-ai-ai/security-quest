@@ -1,13 +1,7 @@
-/* Security Quest — Advanced IT Edition
-   - Expanded levels, images, and integrated leaderboard (sidebar + full view)
-   - Leaderboard supports Apps Script backend or localStorage fallback
-   - Call window.securityQuest.setFinalScore(finalScore) before submitting
-*/
-
 /* ========== Configuration ========== */
-// If you deploy the Google Apps Script web app, paste its URL here.
-// Example: "https://script.google.com/macros/s/AKfy.../exec"
-const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
+// If you deploy a backend (Apps Script), paste its URL here.
+// Leave empty to use localStorage fallback.
+const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKfy.../exec"
 
 /* ========== Game state and DOM refs ========== */
 (() => {
@@ -19,15 +13,6 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
     { id: 5, name: "Network Security", type: "network" },
     { id: 6, name: "Incident Response", type: "incident" }
   ];
-
-  // Image RefIds (from template image search)
-  const IMG_FENCE = "i_turn0image4";
-  const IMG_LIGHT = "i_turn0image7";
-  const IMG_PADLOCK = "i_turn0image1";
-  const IMG_SIGN = "i_turn0image19";
-  const IMG_NETWORK = "i_turn0image13";
-  const IMG_PHISH = "i_turn0image16";
-  const IMG_BADGE = "i_turn0image10";
 
   let score = 0;
   let current = 0;
@@ -55,20 +40,14 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
   const badgesWrap = document.getElementById("badges");
   const playAgain = document.getElementById("playAgain");
 
-  // Leaderboard DOM refs (sidebar)
-  const toggleBtn = document.getElementById("toggleLeaderboard");
+  // Leaderboard DOM refs (lobby only)
   const panel = document.getElementById("leaderboardPanel");
   const submitBtn = document.getElementById("submitScoreBtn");
   const refreshBtn = document.getElementById("refreshLeaderboard");
   const nameInput = document.getElementById("playerName");
   const privacySelect = document.getElementById("playerPrivacy");
   const listEl = document.getElementById("leaderboardList");
-  const fullListEl = document.getElementById("leaderboardFullList");
   const msgEl = document.getElementById("leaderboardMsg");
-  const tabButtons = Array.from(document.querySelectorAll(".tabBtn"));
-  const sideView = document.getElementById("leaderboardSide");
-  const fullView = document.getElementById("leaderboardFull");
-  const closeFull = document.getElementById("closeFull");
 
   // expose helper for game to set final score before submit
   window.securityQuest = window.securityQuest || {};
@@ -95,7 +74,9 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
   function startLevel(id) {
     current = id;
     levelPoints = 0;
+    // hide lobby and leaderboard panel
     lobby.classList.add("hidden");
+    panel.classList.add("hidden");
     gameArea.classList.remove("hidden");
     finalSection.classList.add("hidden");
     nextLevelBtn.disabled = true;
@@ -139,7 +120,7 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
 
   /* ---------- Level implementations ---------- */
 
-  // Level 1: Advanced Site Security Quiz
+  // Level 1: Advanced Site Security Quiz (clickjacking question replaced)
   function renderAdvancedQuiz() {
     const qData = [
       {
@@ -158,9 +139,9 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
         correct: 1
       },
       {
-        q: "Which header helps prevent clickjacking?",
+        q: "Which header helps enforce HTTPS for a site?",
         a: ["Content-Security-Policy", "X-Frame-Options", "Strict-Transport-Security"],
-        correct: 1
+        correct: 2
       },
       {
         q: "Best way to store secrets for an application?",
@@ -176,22 +157,21 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
       qBox.innerHTML = `<strong>Q${i+1}.</strong> ${q.q}`;
       q.a.forEach((opt, idx) => {
         const btn = document.createElement("button");
-        btn.className = "btn ghost";
-        btn.style.margin = "0.35rem";
+        btn.className = "option";
         btn.textContent = opt;
         btn.addEventListener("click", () => {
+          if (btn.disabled) return;
           const correct = idx === q.correct;
           if (correct) {
             levelPoints += 30;
-            btn.style.background = "linear-gradient(180deg,#2bb673,#1f8a56)";
-            btn.style.color = "#04210f";
+            btn.classList.add("correct");
             qBox.classList.add("success");
           } else {
             levelPoints -= 10;
-            btn.style.background = "linear-gradient(180deg,#ff6b6b,#d94b4b)";
+            btn.classList.add("wrong");
             qBox.classList.add("error");
           }
-          Array.from(qBox.querySelectorAll("button")).forEach(b => b.disabled = true);
+          Array.from(qBox.querySelectorAll(".option")).forEach(b => b.disabled = true);
           updateTimerDisplay();
           checkLevelComplete();
         });
@@ -202,7 +182,7 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
     levelContent.appendChild(container);
   }
 
-  // Level 2: URL Verification (with phishing image)
+  // Level 2: URL Verification
   function renderUrlSpot() {
     const items = [
       { url: "https://accounts.school.edu/login", good: true },
@@ -213,31 +193,30 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
     ];
     const container = document.createElement("div");
     container.innerHTML = `<p>Click the secure URL(s). Correct +20; wrong -15. Watch for subdomain tricks and redirects.</p>`;
-    const img = document.createElement("img");
-    img.className = "level-image";
-    img.src = IMG_PHISH;
-    img.alt = "Example phishing email screenshot";
-    container.appendChild(img);
-
     const grid = document.createElement("div");
     grid.className = "matchGrid";
     items.forEach(it => {
       const card = document.createElement("div");
       card.className = "cardItem";
-      card.textContent = it.url;
-      card.addEventListener("click", () => {
-        if (card.dataset.done) return;
+      const btn = document.createElement("button");
+      btn.className = "option";
+      btn.textContent = it.url;
+      btn.addEventListener("click", () => {
+        if (btn.disabled) return;
         if (it.good) {
           levelPoints += 20;
+          btn.classList.add("correct");
           card.classList.add("success");
         } else {
           levelPoints -= 15;
+          btn.classList.add("wrong");
           card.classList.add("error");
         }
-        card.dataset.done = "1";
+        Array.from(card.querySelectorAll(".option")).forEach(b => b.disabled = true);
         updateTimerDisplay();
         checkLevelComplete();
       });
+      card.appendChild(btn);
       grid.appendChild(card);
     });
     container.appendChild(grid);
@@ -296,19 +275,19 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
     levelContent.appendChild(container);
   }
 
-  // Level 4: Perimeter Match (expanded with images)
+  // Level 4: Perimeter Match (expanded)
   function renderMatch() {
     const pairs = [
-      { left: "6-foot chain-link fencing", right: "Deters casual intruders; preserves visibility", img: IMG_FENCE },
-      { left: "Motion-activated lighting", right: "Increases detection at night; reduces hiding spots", img: IMG_LIGHT },
-      { left: "Cut-resistant padlocks", right: "Prevents easy gate access and lock cutting", img: IMG_PADLOCK },
-      { left: "No Trespassing signage with contacts", right: "Provides reporting path and legal notice", img: IMG_SIGN },
-      { left: "Single monitored entrance", right: "Improves access control and visitor screening", img: null },
-      { left: "Clear zone adjacent to fence", right: "Prevents concealment and improves sightlines", img: null }
+      { left: "6-foot chain-link fencing", right: "Deters casual intruders; preserves visibility" },
+      { left: "Motion-activated lighting", right: "Increases detection at night; reduces hiding spots" },
+      { left: "Cut-resistant padlocks", right: "Prevents easy gate access and lock cutting" },
+      { left: "No Trespassing signage with contacts", right: "Provides reporting path and legal notice" },
+      { left: "Single monitored entrance", right: "Improves access control and visitor screening" },
+      { left: "Clear zone adjacent to fence", right: "Prevents concealment and improves sightlines" }
     ];
     const rightShuffled = pairs.map(p => p.right).sort(() => Math.random() - 0.5);
     const container = document.createElement("div");
-    container.innerHTML = `<p>Click a left item, then its matching right item. Correct +30; wrong -15. Click images for context.</p>`;
+    container.innerHTML = `<p>Click a left item, then its matching right item. Correct +30; wrong -15.</p>`;
     const gridL = document.createElement("div");
     gridL.className = "matchGrid";
     pairs.forEach((p, i) => {
@@ -316,13 +295,6 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
       left.className = "cardItem";
       left.innerHTML = `<strong>${p.left}</strong>`;
       left.dataset.idx = i;
-      if (p.img) {
-        const im = document.createElement("img");
-        im.className = "level-image";
-        im.src = p.img;
-        im.alt = p.left;
-        left.appendChild(im);
-      }
       left.addEventListener("click", () => selectLeft(left));
       gridL.appendChild(left);
     });
@@ -367,7 +339,7 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
     }
   }
 
-  // Level 5: Network Security (more prompts + diagram)
+  // Level 5: Network Security (more prompts)
   function renderNetwork() {
     const scenarios = [
       {
@@ -402,13 +374,7 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
       }
     ];
     const container = document.createElement("div");
-    container.innerHTML = `<p>Choose the most secure technical action. Correct +35; wrong -20. A network diagram is shown for context.</p>`;
-    const img = document.createElement("img");
-    img.className = "level-image";
-    img.src = IMG_NETWORK;
-    img.alt = "Network topology diagram";
-    container.appendChild(img);
-
+    container.innerHTML = `<p>Choose the most secure technical action. Correct +35; wrong -20.</p>`;
     scenarios.forEach((s, i) => {
       const box = document.createElement("div");
       box.className = "cardItem";
@@ -416,22 +382,20 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
       box.innerHTML = `<strong>Scenario ${i+1}.</strong> ${s.prompt}`;
       s.options.forEach((opt, idx) => {
         const btn = document.createElement("button");
-        btn.className = "btn ghost";
-        btn.style.margin = "0.35rem";
+        btn.className = "option";
         btn.textContent = opt;
         btn.addEventListener("click", () => {
-          if (btn.dataset.done) return;
+          if (btn.disabled) return;
           if (idx === s.correct) {
             levelPoints += 35;
-            btn.style.background = "linear-gradient(180deg,#2bb673,#1f8a56)";
+            btn.classList.add("correct");
             box.classList.add("success");
           } else {
             levelPoints -= 20;
-            btn.style.background = "linear-gradient(180deg,#ff6b6b,#d94b4b)";
+            btn.classList.add("wrong");
             box.classList.add("error");
           }
-          Array.from(box.querySelectorAll("button")).forEach(b => b.disabled = true);
-          btn.dataset.done = "1";
+          Array.from(box.querySelectorAll(".option")).forEach(b => b.disabled = true);
           updateTimerDisplay();
           checkLevelComplete();
         });
@@ -547,6 +511,7 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
     clearInterval(timerInterval);
     gameArea.classList.add("hidden");
     lobby.classList.remove("hidden");
+    panel.classList.remove("hidden"); // show leaderboard again
   });
 
   startAll.addEventListener("click", () => startLevel(1));
@@ -584,14 +549,16 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
     badges.clear();
     clearInterval(timerInterval);
     lobby.classList.remove("hidden");
+    panel.classList.remove("hidden"); // ensure leaderboard visible
     gameArea.classList.add("hidden");
     finalSection.classList.add("hidden");
     updateUI();
+    renderLeaderboard(); // refresh lobby leaderboard
   }
 
   updateUI();
 
-  /* ========== Leaderboard integration ========== */
+  /* ========== Leaderboard integration (lobby only) ========== */
 
   // Basic username rules
   function validUsername(name) {
@@ -653,7 +620,7 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
     }
   }
 
-  // Render functions
+  // Render leaderboard (lobby)
   async function renderLeaderboard(limit=6) {
     listEl.innerHTML = "";
     msgEl.textContent = "Loading...";
@@ -673,57 +640,8 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
     });
   }
 
-  async function renderFullLeaderboard(limit=50) {
-    fullListEl.innerHTML = "";
-    const rows = await fetchLeaderboard(limit);
-    if (!rows || rows.length === 0) {
-      fullListEl.textContent = "No scores yet.";
-      return;
-    }
-    rows.forEach((r, i) => {
-      const item = document.createElement("div");
-      item.className = "cardItem";
-      item.innerHTML = `<strong>#${i+1} ${escapeHtml(r.name)}</strong>
-                        <div>Score: ${r.score} — ${escapeHtml(r.level || "")}</div>
-                        <div class="muted">${new Date(r.timestamp).toLocaleString()}</div>`;
-      fullListEl.appendChild(item);
-    });
-  }
-
-  // UI wiring for leaderboard
-  toggleBtn.addEventListener("click", () => {
-    if (panel.classList.contains("collapsed")) {
-      panel.classList.remove("collapsed");
-      toggleBtn.textContent = "Hide";
-    } else {
-      panel.classList.add("collapsed");
-      toggleBtn.textContent = "Show";
-    }
-  });
-
-  tabButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      tabButtons.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      const tab = btn.dataset.tab;
-      if (tab === "side") {
-        sideView.classList.remove("hidden");
-        fullView.classList.add("hidden");
-      } else {
-        sideView.classList.add("hidden");
-        fullView.classList.remove("hidden");
-        renderFullLeaderboard(50);
-      }
-    });
-  });
-
+  // UI wiring for leaderboard (lobby)
   refreshBtn.addEventListener("click", () => renderLeaderboard());
-  closeFull.addEventListener("click", () => {
-    tabButtons.forEach(b => b.classList.remove("active"));
-    document.querySelector('.tabBtn[data-tab="side"]').classList.add("active");
-    sideView.classList.remove("hidden");
-    fullView.classList.add("hidden");
-  });
 
   submitBtn.addEventListener("click", async () => {
     const rawName = nameInput.value.trim();
@@ -745,7 +663,7 @@ const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
     }
   });
 
-  // initial render of leaderboard
+  // initial render of leaderboard (lobby)
   renderLeaderboard();
 
 })();
