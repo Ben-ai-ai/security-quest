@@ -1,25 +1,34 @@
-/* Security Quest game logic
-   - Six levels with different mini-games:
-     1. Quick Quiz (multiple choice)
-     2. URL Spotter (spot fake URL)
-     3. Drag & Drop Checklist (physical security)
-     4. Match Cards (perimeter controls)
-     5. Surveillance Puzzle (sequence)
-     6. Construction Lockdown (tool security)
-   - Points, timer, badges, final score
+/* Security Quest — Advanced IT Edition
+   - Expanded levels, images, and integrated leaderboard (sidebar + full view)
+   - Leaderboard supports Apps Script backend or localStorage fallback
+   - Call window.securityQuest.setFinalScore(finalScore) before submitting
 */
 
+/* ========== Configuration ========== */
+// If you deploy the Google Apps Script web app, paste its URL here.
+// Example: "https://script.google.com/macros/s/AKfy.../exec"
+const LEADERBOARD_ENDPOINT = ""; // leave empty to use localStorage fallback
+
+/* ========== Game state and DOM refs ========== */
 (() => {
   const LEVELS = [
     { id: 1, name: "Site Security", type: "quiz" },
     { id: 2, name: "URL Verification", type: "urlspot" },
     { id: 3, name: "Physical Checklist", type: "dragdrop" },
     { id: 4, name: "Perimeter Match", type: "match" },
-    { id: 5, name: "Surveillance Patrol", type: "sequence" },
-    { id: 6, name: "Construction Lockdown", type: "final" }
+    { id: 5, name: "Network Security", type: "network" },
+    { id: 6, name: "Incident Response", type: "incident" }
   ];
 
-  // Game state
+  // Image RefIds (from template image search)
+  const IMG_FENCE = "i_turn0image4";
+  const IMG_LIGHT = "i_turn0image7";
+  const IMG_PADLOCK = "i_turn0image1";
+  const IMG_SIGN = "i_turn0image19";
+  const IMG_NETWORK = "i_turn0image13";
+  const IMG_PHISH = "i_turn0image16";
+  const IMG_BADGE = "i_turn0image10";
+
   let score = 0;
   let current = 0;
   let levelPoints = 0;
@@ -45,6 +54,27 @@
   const finalText = document.getElementById("finalText");
   const badgesWrap = document.getElementById("badges");
   const playAgain = document.getElementById("playAgain");
+
+  // Leaderboard DOM refs (sidebar)
+  const toggleBtn = document.getElementById("toggleLeaderboard");
+  const panel = document.getElementById("leaderboardPanel");
+  const submitBtn = document.getElementById("submitScoreBtn");
+  const refreshBtn = document.getElementById("refreshLeaderboard");
+  const nameInput = document.getElementById("playerName");
+  const privacySelect = document.getElementById("playerPrivacy");
+  const listEl = document.getElementById("leaderboardList");
+  const fullListEl = document.getElementById("leaderboardFullList");
+  const msgEl = document.getElementById("leaderboardMsg");
+  const tabButtons = Array.from(document.querySelectorAll(".tabBtn"));
+  const sideView = document.getElementById("leaderboardSide");
+  const fullView = document.getElementById("leaderboardFull");
+  const closeFull = document.getElementById("closeFull");
+
+  // expose helper for game to set final score before submit
+  window.securityQuest = window.securityQuest || {};
+  window.securityQuest.setFinalScore = function(value) {
+    window.totalGameScore = Number(value) || 0;
+  };
 
   // create level buttons
   LEVELS.forEach(l => {
@@ -77,15 +107,14 @@
     const level = LEVELS.find(l => l.id === current);
     levelTitle.textContent = `Level ${level.id}: ${level.name}`;
     levelContent.innerHTML = "";
-    // set a default timer per level (seconds)
-    timeLeft = 60 + (6 - level.id) * 10; // earlier levels shorter
+    timeLeft = 90 + (6 - level.id) * 12;
     startTimer();
-    if (level.type === "quiz") renderQuiz();
+    if (level.type === "quiz") renderAdvancedQuiz();
     if (level.type === "urlspot") renderUrlSpot();
     if (level.type === "dragdrop") renderDragDrop();
     if (level.type === "match") renderMatch();
-    if (level.type === "sequence") renderSequence();
-    if (level.type === "final") renderFinalMini();
+    if (level.type === "network") renderNetwork();
+    if (level.type === "incident") renderIncident();
   }
 
   function startTimer() {
@@ -108,17 +137,42 @@
     levelPointsEl.textContent = `Level Points: ${levelPoints}`;
   }
 
-  // Level 1: Quick Quiz
-  function renderQuiz() {
+  /* ---------- Level implementations ---------- */
+
+  // Level 1: Advanced Site Security Quiz
+  function renderAdvancedQuiz() {
     const qData = [
-      { q: "Use the same password for all sites?", a: ["Yes", "No", "Only for similar sites"], correct: 1 },
-      { q: "What should you do before entering credentials?", a: ["Check URL & HTTPS", "Trust the email link", "Ignore certificate warnings"], correct: 0 },
-      { q: "Leaving a shared computer?", a: ["Lock screen", "Leave logged in", "Write password down"], correct: 0 }
+      {
+        q: "Which practice best defends against credential stuffing attacks?",
+        a: ["Use unique passwords and MFA", "Use a single strong password", "Rely on browser password manager only"],
+        correct: 0
+      },
+      {
+        q: "A third-party plugin requests broad permissions. Best action?",
+        a: ["Grant permissions temporarily", "Review scope and vendor, then limit permissions", "Ignore and install anyway"],
+        correct: 1
+      },
+      {
+        q: "You receive a password reset email you didn't request. What do you do?",
+        a: ["Click the link to confirm it's you", "Ignore and report to IT; change password if suspicious", "Reply asking who requested it"],
+        correct: 1
+      },
+      {
+        q: "Which header helps prevent clickjacking?",
+        a: ["Content-Security-Policy", "X-Frame-Options", "Strict-Transport-Security"],
+        correct: 1
+      },
+      {
+        q: "Best way to store secrets for an application?",
+        a: ["Hard-code in source with access control", "Use a secrets manager with least privilege", "Store in a public repo but obfuscate"],
+        correct: 1
+      }
     ];
     const container = document.createElement("div");
     qData.forEach((q, i) => {
       const qBox = document.createElement("div");
       qBox.className = "cardItem";
+      qBox.style.textAlign = "left";
       qBox.innerHTML = `<strong>Q${i+1}.</strong> ${q.q}`;
       q.a.forEach((opt, idx) => {
         const btn = document.createElement("button");
@@ -128,14 +182,15 @@
         btn.addEventListener("click", () => {
           const correct = idx === q.correct;
           if (correct) {
-            levelPoints += 20;
+            levelPoints += 30;
             btn.style.background = "linear-gradient(180deg,#2bb673,#1f8a56)";
             btn.style.color = "#04210f";
+            qBox.classList.add("success");
           } else {
-            levelPoints -= 5;
+            levelPoints -= 10;
             btn.style.background = "linear-gradient(180deg,#ff6b6b,#d94b4b)";
+            qBox.classList.add("error");
           }
-          // disable siblings
           Array.from(qBox.querySelectorAll("button")).forEach(b => b.disabled = true);
           updateTimerDisplay();
           checkLevelComplete();
@@ -147,16 +202,23 @@
     levelContent.appendChild(container);
   }
 
-  // Level 2: URL Spotter
+  // Level 2: URL Verification (with phishing image)
   function renderUrlSpot() {
     const items = [
-      { url: "https://portal.school.edu/login", good: true },
-      { url: "http://portal.school.edu/login", good: false },
-      { url: "https://portal.school.eduu/login", good: false },
-      { url: "https://school.edu.secure-login.com", good: false }
+      { url: "https://accounts.school.edu/login", good: true },
+      { url: "https://school-accounts.secure-login.com", good: false },
+      { url: "https://accounts.school.edu.login.verify.net", good: false },
+      { url: "https://accounts.school.edu/login?redirect=https://evil.com", good: false },
+      { url: "https://accounts.school.edu/login#auth", good: true }
     ];
     const container = document.createElement("div");
-    container.innerHTML = `<p>Click the <strong>secure</strong> URL(s). Correct picks +15 points each; wrong picks -10.</p>`;
+    container.innerHTML = `<p>Click the secure URL(s). Correct +20; wrong -15. Watch for subdomain tricks and redirects.</p>`;
+    const img = document.createElement("img");
+    img.className = "level-image";
+    img.src = IMG_PHISH;
+    img.alt = "Example phishing email screenshot";
+    container.appendChild(img);
+
     const grid = document.createElement("div");
     grid.className = "matchGrid";
     items.forEach(it => {
@@ -166,13 +228,11 @@
       card.addEventListener("click", () => {
         if (card.dataset.done) return;
         if (it.good) {
-          levelPoints += 15;
-          card.style.borderColor = "var(--success)";
-          card.style.boxShadow = "0 6px 18px rgba(43,182,115,0.08)";
+          levelPoints += 20;
+          card.classList.add("success");
         } else {
-          levelPoints -= 10;
-          card.style.borderColor = "var(--danger)";
-          card.style.boxShadow = "0 6px 18px rgba(255,107,107,0.08)";
+          levelPoints -= 15;
+          card.classList.add("error");
         }
         card.dataset.done = "1";
         updateTimerDisplay();
@@ -184,17 +244,21 @@
     levelContent.appendChild(container);
   }
 
-  // Level 3: Drag & Drop Checklist
+  // Level 3: Drag & Drop Checklist (physical security)
   function renderDragDrop() {
     const items = [
       "Lock screen when away",
       "Save passwords on shared PC",
       "Shred printed sensitive docs",
-      "Share account with coworkers"
+      "Plug unknown USB into workstation",
+      "Use cable lock for laptop",
+      "Leave workstation unlocked overnight",
+      "Store backups in encrypted drives",
+      "Label sensitive printouts with 'Confidential'"
     ];
-    const good = ["Lock screen when away", "Shred printed sensitive docs"];
+    const good = ["Lock screen when away", "Shred printed sensitive docs", "Use cable lock for laptop", "Store backups in encrypted drives"];
     const container = document.createElement("div");
-    container.innerHTML = `<p>Drag the good practices into the secure box. Each correct +20, wrong -10.</p>`;
+    container.innerHTML = `<p>Drag secure practices into the secure box. Correct +25, wrong -15.</p>`;
     const dragWrap = document.createElement("div");
     dragWrap.className = "dragArea";
     items.forEach(text => {
@@ -219,10 +283,8 @@
       node.className = "cardItem";
       node.textContent = text;
       drop.appendChild(node);
-      // score
-      if (good.includes(text)) levelPoints += 20;
-      else levelPoints -= 10;
-      // remove draggable
+      if (good.includes(text)) levelPoints += 25;
+      else levelPoints -= 15;
       Array.from(dragWrap.children).forEach(c => {
         if (c.textContent === text) c.remove();
       });
@@ -234,38 +296,46 @@
     levelContent.appendChild(container);
   }
 
-  // Level 4: Match Cards (Perimeter)
+  // Level 4: Perimeter Match (expanded with images)
   function renderMatch() {
     const pairs = [
-      { left: "6-foot fencing", right: "Prevents easy climb" },
-      { left: "Motion lights", right: "Expose nighttime activity" },
-      { left: "No Trespassing signs", right: "Warn and provide contacts" }
+      { left: "6-foot chain-link fencing", right: "Deters casual intruders; preserves visibility", img: IMG_FENCE },
+      { left: "Motion-activated lighting", right: "Increases detection at night; reduces hiding spots", img: IMG_LIGHT },
+      { left: "Cut-resistant padlocks", right: "Prevents easy gate access and lock cutting", img: IMG_PADLOCK },
+      { left: "No Trespassing signage with contacts", right: "Provides reporting path and legal notice", img: IMG_SIGN },
+      { left: "Single monitored entrance", right: "Improves access control and visitor screening", img: null },
+      { left: "Clear zone adjacent to fence", right: "Prevents concealment and improves sightlines", img: null }
     ];
-    // shuffle right side
     const rightShuffled = pairs.map(p => p.right).sort(() => Math.random() - 0.5);
     const container = document.createElement("div");
-    container.innerHTML = `<p>Click a left item, then its matching right item.</p>`;
-    const grid = document.createElement("div");
-    grid.className = "matchGrid";
+    container.innerHTML = `<p>Click a left item, then its matching right item. Correct +30; wrong -15. Click images for context.</p>`;
+    const gridL = document.createElement("div");
+    gridL.className = "matchGrid";
     pairs.forEach((p, i) => {
       const left = document.createElement("div");
       left.className = "cardItem";
-      left.textContent = p.left;
+      left.innerHTML = `<strong>${p.left}</strong>`;
       left.dataset.idx = i;
+      if (p.img) {
+        const im = document.createElement("img");
+        im.className = "level-image";
+        im.src = p.img;
+        im.alt = p.left;
+        left.appendChild(im);
+      }
       left.addEventListener("click", () => selectLeft(left));
-      grid.appendChild(left);
+      gridL.appendChild(left);
     });
     const gridR = document.createElement("div");
     gridR.className = "matchGrid";
-    rightShuffled.forEach((r, i) => {
+    rightShuffled.forEach(r => {
       const right = document.createElement("div");
       right.className = "cardItem";
       right.textContent = r;
-      right.dataset.r = r;
       right.addEventListener("click", () => selectRight(right));
       gridR.appendChild(right);
     });
-    container.appendChild(grid);
+    container.appendChild(gridL);
     container.appendChild(gridR);
     levelContent.appendChild(container);
 
@@ -277,17 +347,17 @@
     }
     function selectRight(el) {
       if (!selectedLeft) return;
-      const leftText = selectedLeft.textContent;
+      const leftText = selectedLeft.textContent.replace(/\s+/g, " ").trim();
       const rightText = el.textContent;
-      const match = pairs.find(p => p.left === leftText && p.right === rightText);
-      if (match) {
-        levelPoints += 25;
-        selectedLeft.style.background = "linear-gradient(180deg,#2bb673,#1f8a56)";
-        el.style.background = "linear-gradient(180deg,#2bb673,#1f8a56)";
+      const match = pairs.find(p => p.right === rightText && leftText.includes(p.left.split(" ")[0]));
+      if (match && leftText.includes(match.left.split(" ")[0])) {
+        levelPoints += 30;
+        selectedLeft.classList.add("success");
+        el.classList.add("success");
       } else {
-        levelPoints -= 10;
-        selectedLeft.style.background = "linear-gradient(180deg,#ff6b6b,#d94b4b)";
-        el.style.background = "linear-gradient(180deg,#ff6b6b,#d94b4b)";
+        levelPoints -= 15;
+        selectedLeft.classList.add("error");
+        el.classList.add("error");
       }
       selectedLeft.removeEventListener("click", selectLeft);
       el.removeEventListener("click", selectRight);
@@ -297,110 +367,155 @@
     }
   }
 
-  // Level 5: Sequence (Surveillance Patrol)
-  function renderSequence() {
-    const steps = [
-      "Check cameras",
-      "Patrol blind spots",
-      "Secure storage",
-      "Log findings"
-    ];
-    const shuffled = steps.slice().sort(() => Math.random() - 0.5);
-    const container = document.createElement("div");
-    container.innerHTML = `<p>Click the steps in the correct order for a patrol. Correct order gives +30 bonus.</p>`;
-    const grid = document.createElement("div");
-    grid.className = "matchGrid";
-    shuffled.forEach(s => {
-      const b = document.createElement("div");
-      b.className = "cardItem";
-      b.textContent = s;
-      b.addEventListener("click", () => pickStep(b));
-      grid.appendChild(b);
-    });
-    container.appendChild(grid);
-    levelContent.appendChild(container);
-
-    let idx = 0;
-    function pickStep(el) {
-      const expected = steps[idx];
-      if (el.textContent === expected) {
-        levelPoints += 10;
-        el.style.background = "linear-gradient(180deg,#2bb673,#1f8a56)";
-        idx++;
-        if (idx === steps.length) {
-          levelPoints += 30; // bonus
-          checkLevelComplete();
-        }
-      } else {
-        levelPoints -= 10;
-        el.style.background = "linear-gradient(180deg,#ff6b6b,#d94b4b)";
+  // Level 5: Network Security (more prompts + diagram)
+  function renderNetwork() {
+    const scenarios = [
+      {
+        prompt: "A router has default admin credentials. Best action?",
+        options: ["Leave as is for convenience", "Change to unique strong password and restrict admin access", "Disable admin access entirely"],
+        correct: 1
+      },
+      {
+        prompt: "An open Wi‑Fi SSID with no encryption is discovered. Best immediate step?",
+        options: ["Ignore it", "Notify network admin and avoid connecting", "Connect and test throughput"],
+        correct: 1
+      },
+      {
+        prompt: "Firewall rule allows all inbound RDP to a server. Best remediation?",
+        options: ["Keep it; RDP is needed", "Restrict RDP to specific IPs and enable MFA", "Move server to DMZ without changes"],
+        correct: 1
+      },
+      {
+        prompt: "You find an unmanaged switch in a wiring closet. Best practice?",
+        options: ["Leave it connected", "Label, inventory, and restrict physical access; document configuration", "Use it for temporary guest access"],
+        correct: 1
+      },
+      {
+        prompt: "A server shows unusual outbound traffic to unknown IPs. First technical step?",
+        options: ["Block outbound traffic and capture PCAP for analysis", "Reboot server immediately", "Disable logging to reduce noise"],
+        correct: 0
+      },
+      {
+        prompt: "Which practice reduces risk from exposed management interfaces?",
+        options: ["Expose interfaces to the internet for convenience", "Use jump hosts, restrict by IP, and enable MFA", "Use default ports and credentials"],
+        correct: 1
       }
-      el.removeEventListener("click", pickStep);
-      updateTimerDisplay();
-    }
+    ];
+    const container = document.createElement("div");
+    container.innerHTML = `<p>Choose the most secure technical action. Correct +35; wrong -20. A network diagram is shown for context.</p>`;
+    const img = document.createElement("img");
+    img.className = "level-image";
+    img.src = IMG_NETWORK;
+    img.alt = "Network topology diagram";
+    container.appendChild(img);
+
+    scenarios.forEach((s, i) => {
+      const box = document.createElement("div");
+      box.className = "cardItem";
+      box.style.textAlign = "left";
+      box.innerHTML = `<strong>Scenario ${i+1}.</strong> ${s.prompt}`;
+      s.options.forEach((opt, idx) => {
+        const btn = document.createElement("button");
+        btn.className = "btn ghost";
+        btn.style.margin = "0.35rem";
+        btn.textContent = opt;
+        btn.addEventListener("click", () => {
+          if (btn.dataset.done) return;
+          if (idx === s.correct) {
+            levelPoints += 35;
+            btn.style.background = "linear-gradient(180deg,#2bb673,#1f8a56)";
+            box.classList.add("success");
+          } else {
+            levelPoints -= 20;
+            btn.style.background = "linear-gradient(180deg,#ff6b6b,#d94b4b)";
+            box.classList.add("error");
+          }
+          Array.from(box.querySelectorAll("button")).forEach(b => b.disabled = true);
+          btn.dataset.done = "1";
+          updateTimerDisplay();
+          checkLevelComplete();
+        });
+        box.appendChild(btn);
+      });
+      container.appendChild(box);
+    });
+    levelContent.appendChild(container);
   }
 
-  // Level 6: Final mini-game (Construction Lockdown)
-  function renderFinalMini() {
-    const container = document.createElement("div");
-    container.innerHTML = `<p>Final challenge: choose the three best actions to secure a construction site. Choose wisely — big points for perfect selection.</p>`;
-    const options = [
-      "Lock tools in steel container",
-      "Leave small tools overnight",
-      "Keep a clear zone by the fence",
-      "Share site keys with contractors",
-      "Post emergency contact numbers"
+  // Level 6: Incident Response — extended steps and ordering
+  function renderIncident() {
+    const tasks = [
+      "Isolate affected systems",
+      "Preserve logs and evidence",
+      "Identify scope and affected assets",
+      "Notify incident response team",
+      "Apply temporary mitigations",
+      "Communicate to stakeholders with approved messaging",
+      "Perform root cause analysis",
+      "Remediate and validate systems before restore",
+      "Document lessons learned and update playbooks"
     ];
-    const correct = ["Lock tools in steel container", "Keep a clear zone by the fence", "Post emergency contact numbers"];
-    options.forEach(opt => {
-      const b = document.createElement("button");
-      b.className = "btn ghost";
-      b.style.margin = "0.35rem";
-      b.textContent = opt;
+    const container = document.createElement("div");
+    container.innerHTML = `<p>Select and order the first five actions for a suspected breach. Correct selections +40 each; correct order bonus +80.</p>`;
+    const optionsWrap = document.createElement("div");
+    optionsWrap.className = "matchGrid";
+    tasks.forEach(t => {
+      const b = document.createElement("div");
+      b.className = "cardItem";
+      b.textContent = t;
       b.addEventListener("click", () => {
-        if (b.dataset.chosen) {
-          b.dataset.chosen = "";
-          b.style.opacity = 1;
-        } else {
-          b.dataset.chosen = "1";
-          b.style.opacity = 0.6;
-        }
+        if (b.dataset.chosen) return;
+        const order = container.querySelectorAll(".chosen").length + 1;
+        const chosen = document.createElement("div");
+        chosen.className = "cardItem chosen";
+        chosen.textContent = `${order}. ${t}`;
+        container.appendChild(chosen);
+        b.dataset.chosen = "1";
       });
-      container.appendChild(b);
+      optionsWrap.appendChild(b);
     });
     const submit = document.createElement("div");
     submit.style.marginTop = "0.6rem";
     const sbtn = document.createElement("button");
     sbtn.className = "btn";
-    sbtn.textContent = "Submit Final Selection";
+    sbtn.textContent = "Submit Incident Plan";
     sbtn.addEventListener("click", () => {
-      const chosen = Array.from(container.querySelectorAll("button")).filter(b => b.dataset.chosen).map(b => b.textContent);
-      let correctCount = chosen.filter(c => correct.includes(c)).length;
-      let wrongCount = chosen.length - correctCount;
-      levelPoints += correctCount * 30;
-      levelPoints -= wrongCount * 15;
-      // perfect bonus
-      if (correctCount === correct.length && wrongCount === 0) {
-        levelPoints += 50;
-        badges.add("Construction Guardian");
+      const chosenEls = Array.from(container.querySelectorAll(".chosen"));
+      const chosen = chosenEls.map(e => e.textContent.replace(/^\d+\.\s*/, ""));
+      const required = [
+        "Isolate affected systems",
+        "Preserve logs and evidence",
+        "Identify scope and affected assets",
+        "Notify incident response team",
+        "Apply temporary mitigations"
+      ];
+      let correctCount = 0;
+      chosen.slice(0, 5).forEach(c => {
+        if (required.includes(c)) correctCount++;
+      });
+      levelPoints += correctCount * 40;
+      const chosenFirstFive = chosen.slice(0, 5);
+      if (chosenFirstFive.length === 5 && chosenFirstFive.every((v, i) => v === required[i])) {
+        levelPoints += 80;
+        badges.add("IR Specialist");
       }
+      const wrong = 5 - correctCount;
+      levelPoints -= wrong * 25;
       updateTimerDisplay();
       checkLevelComplete();
     });
     submit.appendChild(sbtn);
-    container.appendChild(submit);
-    levelContent.appendChild(container);
+    levelContent.appendChild(optionsWrap);
+    levelContent.appendChild(submit);
   }
 
-  // Check if level should finish (simple heuristic: enough interactions or time)
+  /* ---------- Level completion and navigation ---------- */
+
   function checkLevelComplete() {
-    // small delay to allow UI updates
     setTimeout(() => {
-      // if levelPoints high enough or many interactions, finish
-      if (levelPoints >= 60 || timeLeft < 10) {
+      if (levelPoints >= 120 || timeLeft < 8) {
         finishLevel(true, "Level complete!");
       } else {
-        // enable next if some progress
         if (levelPoints > 0) nextLevelBtn.disabled = false;
       }
       updateUI();
@@ -409,27 +524,19 @@
 
   function finishLevel(success, message) {
     clearInterval(timerInterval);
-    // award score
-    const bonus = Math.max(0, Math.floor(timeLeft / 5));
+    const bonus = Math.max(0, Math.floor(timeLeft / 4));
     const totalGain = Math.max(0, levelPoints) + (success ? bonus : 0);
     score += totalGain;
-    // badges by level
-    if (levelPoints >= 80) badges.add(`Level${current} Ace`);
+    if (levelPoints >= 150) badges.add(`Level${current} Ace`);
     updateUI();
-    // show message and enable next
     levelContent.innerHTML = `<div class="result">${message} You earned ${totalGain} points this level.</div>`;
     nextLevelBtn.disabled = false;
-    // if last level, show final button text
-    if (current === LEVELS.length) {
-      nextLevelBtn.textContent = "Finish Game";
-    } else {
-      nextLevelBtn.textContent = "Next Level";
-    }
+    if (current === LEVELS.length) nextLevelBtn.textContent = "Finish Game";
+    else nextLevelBtn.textContent = "Next Level";
   }
 
   nextLevelBtn.addEventListener("click", () => {
     if (current === LEVELS.length) {
-      // finish game
       showFinal();
     } else {
       startLevel(current + 1);
@@ -453,23 +560,21 @@
     lobby.classList.add("hidden");
     finalText.textContent = `Your final score is ${score} points.`;
     badgesWrap.innerHTML = "";
-    if (badges.size === 0) {
-      badgesWrap.textContent = "No badges earned. Try for perfect rounds!";
-    } else {
-      badges.forEach(b => {
-        const el = document.createElement("div");
-        el.className = "badge";
-        el.textContent = b;
-        badgesWrap.appendChild(el);
-      });
-    }
-    // champion title
-    if (score >= 300) {
+    if (badges.size === 0) badgesWrap.textContent = "No badges earned. Try for perfect rounds!";
+    else badges.forEach(b => {
+      const el = document.createElement("div");
+      el.className = "badge";
+      el.textContent = b;
+      badgesWrap.appendChild(el);
+    });
+    if (score >= 400) {
       const champ = document.createElement("div");
       champ.className = "badge";
       champ.textContent = "Security Champion";
       badgesWrap.appendChild(champ);
     }
+    // set final score for leaderboard submission
+    window.securityQuest.setFinalScore(score);
   }
 
   function resetAll() {
@@ -484,6 +589,163 @@
     updateUI();
   }
 
-  // initial UI
   updateUI();
+
+  /* ========== Leaderboard integration ========== */
+
+  // Basic username rules
+  function validUsername(name) {
+    if (!name) return false;
+    const trimmed = name.trim();
+    if (trimmed.length < 2 || trimmed.length > 20) return false;
+    const re = /^[A-Za-z0-9_\- ]+$/;
+    return re.test(trimmed);
+  }
+
+  // Escape HTML
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // Local storage helpers
+  const LOCAL_KEY = "securityQuest_localLeaderboard_v1";
+  function saveLocalScore(name, scoreVal, level) {
+    const list = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
+    list.push({ name, score: Number(scoreVal) || 0, level, timestamp: new Date().toISOString() });
+    list.sort((a,b) => b.score - a.score);
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(list.slice(0, 100)));
+  }
+  function loadLocalScores(limit=10) {
+    return JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]").slice(0, limit);
+  }
+
+  // Backend functions
+  async function fetchLeaderboard(limit=10) {
+    if (!LEADERBOARD_ENDPOINT) return loadLocalScores(limit);
+    try {
+      const url = `${LEADERBOARD_ENDPOINT}?action=leaderboard&limit=${limit}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Network error");
+      const data = await res.json();
+      return data.leaderboard || [];
+    } catch (err) {
+      console.warn("Leaderboard fetch failed, using local fallback", err);
+      return loadLocalScores(limit);
+    }
+  }
+
+  async function submitScoreToBackend(name, scoreVal, level='Final') {
+    if (!LEADERBOARD_ENDPOINT) {
+      saveLocalScore(name, scoreVal, level);
+      return { status: "ok", source: "local" };
+    }
+    try {
+      const payload = { name, score: Number(scoreVal) || 0, level };
+      const res = await fetch(LEADERBOARD_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.warn("Submit failed, saving locally", err);
+      saveLocalScore(name, scoreVal, level);
+      return { status: "ok", source: "local" };
+    }
+  }
+
+  // Render functions
+  async function renderLeaderboard(limit=6) {
+    listEl.innerHTML = "";
+    msgEl.textContent = "Loading...";
+    const rows = await fetchLeaderboard(limit);
+    if (!rows || rows.length === 0) {
+      msgEl.textContent = "No scores yet — be the first!";
+      return;
+    }
+    msgEl.textContent = "";
+    rows.slice(0, limit).forEach((r, i) => {
+      const item = document.createElement("div");
+      item.className = "cardItem";
+      item.innerHTML = `<strong>#${i+1} ${escapeHtml(r.name)}</strong>
+                        <div>Score: ${r.score} — ${escapeHtml(r.level || "")}</div>
+                        <div class="muted">${new Date(r.timestamp).toLocaleString()}</div>`;
+      listEl.appendChild(item);
+    });
+  }
+
+  async function renderFullLeaderboard(limit=50) {
+    fullListEl.innerHTML = "";
+    const rows = await fetchLeaderboard(limit);
+    if (!rows || rows.length === 0) {
+      fullListEl.textContent = "No scores yet.";
+      return;
+    }
+    rows.forEach((r, i) => {
+      const item = document.createElement("div");
+      item.className = "cardItem";
+      item.innerHTML = `<strong>#${i+1} ${escapeHtml(r.name)}</strong>
+                        <div>Score: ${r.score} — ${escapeHtml(r.level || "")}</div>
+                        <div class="muted">${new Date(r.timestamp).toLocaleString()}</div>`;
+      fullListEl.appendChild(item);
+    });
+  }
+
+  // UI wiring for leaderboard
+  toggleBtn.addEventListener("click", () => {
+    if (panel.classList.contains("collapsed")) {
+      panel.classList.remove("collapsed");
+      toggleBtn.textContent = "Hide";
+    } else {
+      panel.classList.add("collapsed");
+      toggleBtn.textContent = "Show";
+    }
+  });
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      tabButtons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      if (tab === "side") {
+        sideView.classList.remove("hidden");
+        fullView.classList.add("hidden");
+      } else {
+        sideView.classList.add("hidden");
+        fullView.classList.remove("hidden");
+        renderFullLeaderboard(50);
+      }
+    });
+  });
+
+  refreshBtn.addEventListener("click", () => renderLeaderboard());
+  closeFull.addEventListener("click", () => {
+    tabButtons.forEach(b => b.classList.remove("active"));
+    document.querySelector('.tabBtn[data-tab="side"]').classList.add("active");
+    sideView.classList.remove("hidden");
+    fullView.classList.add("hidden");
+  });
+
+  submitBtn.addEventListener("click", async () => {
+    const rawName = nameInput.value.trim();
+    const privacy = privacySelect.value;
+    const name = privacy === "anonymous" ? "Anonymous" : rawName;
+    if (privacy !== "anonymous" && !validUsername(rawName)) {
+      msgEl.textContent = "Username must be 2–20 characters and use letters, numbers, spaces, - or _.";
+      return;
+    }
+    const finalScore = (typeof window.totalGameScore !== "undefined") ? window.totalGameScore : (typeof score !== "undefined" ? score : 0);
+    const level = `Final`;
+    msgEl.textContent = "Submitting...";
+    const res = await submitScoreToBackend(name, finalScore, level);
+    if (res && (res.status === "ok" || res.source === "local")) {
+      msgEl.textContent = "Score submitted!";
+      renderLeaderboard();
+    } else {
+      msgEl.textContent = "Submission failed.";
+    }
+  });
+
+  // initial render of leaderboard
+  renderLeaderboard();
+
 })();
