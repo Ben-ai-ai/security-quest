@@ -8,6 +8,7 @@
   --wrap:1100px;
 }
 
+/* Reset and base */
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
@@ -18,13 +19,10 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 
+/* Layout */
 .wrap{max-width:var(--wrap);margin:1.25rem auto;padding:0 1rem;display:grid;grid-template-columns:1fr 360px;gap:1rem}
-
 .header{grid-column:1/-1;background:#071428;border-bottom:1px solid rgba(127,147,255,0.06)}
 .header .wrap{padding:1rem}
-.header-inner{display:flex;align-items:center;gap:1rem}
-.brand{display:flex;gap:0.75rem;align-items:center}
-.logo{width:56px;height:56px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,0.04)}
 .header h1{margin:0;font-size:1.25rem}
 .tag{margin:0.25rem 0 0;color:var(--muted)}
 
@@ -37,10 +35,9 @@ body{
   box-shadow:0 8px 24px rgba(2,6,23,0.5);
 }
 
+/* Lobby and leaderboard */
 .lobby-card{grid-column:1/2}
 .leaderboard-panel{grid-column:2/3;position:sticky;top:1rem;height:fit-content}
-
-.center{text-align:center}
 
 .levels{display:flex;flex-wrap:wrap;gap:0.5rem;justify-content:flex-start;margin-top:0.75rem}
 .levelBtn{
@@ -51,42 +48,56 @@ body{
 .levelBtn.locked{opacity:0.45;cursor:not-allowed}
 
 .status{margin-top:0.75rem;display:flex;gap:1rem;align-items:center;color:var(--muted)}
-
 .controls{margin-top:0.75rem;display:flex;gap:0.5rem;justify-content:flex-start}
 .btn{background:var(--accent);border:none;color:#042033;padding:0.55rem 0.9rem;border-radius:999px;font-weight:700;cursor:pointer}
 .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
 
 .hidden{display:none}
 
+/* Game area */
 .gameHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem}
 .timerWrap{color:var(--muted);display:flex;gap:1rem;align-items:center}
-
 .levelContent{min-height:360px;padding:0.8rem;border-radius:8px;background:linear-gradient(180deg,#071226,#06101a);border:1px solid rgba(255,255,255,0.02)}
 
+/* Card and option layout */
 .matchGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.6rem}
-.cardItem{background:#0b1a2a;padding:0.6rem;border-radius:8px;border:1px solid rgba(255,255,255,0.03);cursor:pointer;text-align:center}
+.cardItem{
+  background:#0b1a2a;padding:0.6rem;border-radius:8px;border:1px solid rgba(255,255,255,0.03);
+  cursor:pointer;text-align:left;
+  word-break:break-word;overflow-wrap:anywhere;white-space:normal;
+  display:flex;flex-direction:column;gap:0.5rem;
+}
+.cardItem strong{display:block;margin-bottom:0.25rem}
 
-.draggable{background:#0b2233;padding:0.6rem;border-radius:8px;border:1px dashed rgba(255,255,255,0.06);cursor:grab}
+/* Option buttons: full-width blocks with clear separators */
+.cardItem .option{
+  display:block;
+  width:100%;
+  text-align:left;
+  padding:0.6rem 0.75rem;
+  margin:0;
+  border:1px solid rgba(255,255,255,0.04);
+  background:transparent;
+  color:inherit;
+  border-radius:6px;
+  cursor:pointer;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.cardItem .option + .option{margin-top:0.45rem}
 
-.checklistDrop{min-height:140px;border:2px dashed rgba(255,255,255,0.04);padding:0.6rem;border-radius:8px}
-
-.result{margin-top:0.6rem;font-weight:700;color:var(--muted)}
-
-.badges{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem}
-.badge{background:linear-gradient(180deg,#1b3a2b,#0b2a1b);padding:0.5rem 0.7rem;border-radius:999px;color:#dfffe8;font-weight:700;border:1px solid rgba(255,255,255,0.03)}
-
-.footer{grid-column:1/-1;border-top:1px solid rgba(127,147,255,0.04);padding:1rem 0;margin-top:1rem;color:var(--muted);text-align:center}
-
-/* success / error outlines applied by JS */
+/* Visual feedback for option states */
 .cardItem.success{box-shadow:0 6px 18px rgba(43,182,115,0.08);border-color:var(--success)}
 .cardItem.error{box-shadow:0 6px 18px rgba(255,107,107,0.08);border-color:var(--danger)}
+.cardItem .option.correct{background:linear-gradient(180deg,#2bb673,#1f8a56);color:#04210f;border-color:transparent}
+.cardItem .option.wrong{background:linear-gradient(180deg,#ff6b6b,#d94b4b);color:#2b0b0b;border-color:transparent}
 
-.level-image{max-width:100%;border-radius:8px;margin:0.5rem 0;border:1px solid rgba(255,255,255,0.04)}
+/* Drag & drop */
+.draggable{background:#0b2233;padding:0.6rem;border-radius:8px;border:1px dashed rgba(255,255,255,0.06);cursor:grab;white-space:normal;overflow-wrap:anywhere}
+.checklistDrop{min-height:140px;border:2px dashed rgba(255,255,255,0.04);padding:0.6rem;border-radius:8px}
 
+/* Leaderboard styles */
 .leaderboard-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem}
-.leaderboard-tabs{display:flex;gap:0.4rem;margin-bottom:0.6rem}
-.tabBtn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:0.35rem 0.6rem;border-radius:6px;color:var(--muted);cursor:pointer}
-.tabBtn.active{background:var(--accent);color:#042033;border:none}
 #leaderboardControls{display:flex;gap:0.4rem;align-items:center;margin-bottom:0.6rem}
 #leaderboardControls input{flex:1;padding:0.45rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
 #leaderboardControls select{padding:0.45rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
@@ -94,7 +105,13 @@ body{
 .leaderboard-list .cardItem{display:flex;flex-direction:column;align-items:flex-start;padding:0.5rem;margin-bottom:0.4rem}
 .leaderboard-full{padding:0.6rem}
 
-/* responsive: stack columns on small screens */
+/* Misc */
+.result{margin-top:0.6rem;font-weight:700;color:var(--muted)}
+.badges{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem}
+.badge{background:linear-gradient(180deg,#1b3a2b,#0b2a1b);padding:0.5rem 0.7rem;border-radius:999px;color:#dfffe8;font-weight:700;border:1px solid rgba(255,255,255,0.03)}
+.footer{grid-column:1/-1;border-top:1px solid rgba(127,147,255,0.04);padding:1rem 0;margin-top:1rem;color:var(--muted);text-align:center}
+
+/* Responsive: stack columns on small screens */
 @media (max-width:980px){
   .wrap{grid-template-columns:1fr;gap:0.75rem}
   .leaderboard-panel{position:static}
