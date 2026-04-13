@@ -19,7 +19,13 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
   let levelPoints = 0;
   let timerInterval = null;
   let timeLeft = 0;
+  let levelFinished = false;
   const badges = new Set();
+
+  // Simple array shuffle
+  function shuffle(arr) {
+    return arr.sort(() => Math.random() - 0.5);
+  }
 
   // DOM
   const levelsEl = document.getElementById("levels");
@@ -74,6 +80,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
   function startLevel(id) {
     current = id;
     levelPoints = 0;
+    levelFinished = false;
     // hide lobby and leaderboard panel
     lobby.classList.add("hidden");
     panel.classList.add("hidden");
@@ -104,7 +111,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     timerInterval = setInterval(() => {
       timeLeft--;
       updateTimerDisplay();
-      if (timeLeft <= 0) {
+      if (timeLeft <= 0 && !levelFinished) {
         clearInterval(timerInterval);
         finishLevel(false, "Time's up!");
       }
@@ -120,7 +127,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
 
   /* ---------- Level implementations ---------- */
 
-  // Level 1: Advanced Site Security Quiz (clickjacking question replaced)
+  // Level 1: Advanced Site Security Quiz (with randomized options)
   function renderAdvancedQuiz() {
     const qData = [
       {
@@ -144,20 +151,30 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
         correct: 1
       }
     ];
+
     const container = document.createElement("div");
+    let answered = 0;
+
     qData.forEach((q, i) => {
       const qBox = document.createElement("div");
       qBox.className = "cardItem";
       qBox.style.textAlign = "left";
       qBox.innerHTML = `<strong>Q${i+1}.</strong> ${q.q}`;
-      q.a.forEach((opt, idx) => {
+
+      // build option objects and shuffle
+      const options = q.a.map((text, idx) => ({
+        text,
+        isCorrect: idx === q.correct
+      }));
+      shuffle(options);
+
+      options.forEach(opt => {
         const btn = document.createElement("button");
         btn.className = "option";
-        btn.textContent = opt;
+        btn.textContent = opt.text;
         btn.addEventListener("click", () => {
-          if (btn.disabled) return;
-          const correct = idx === q.correct;
-          if (correct) {
+          if (btn.disabled || levelFinished) return;
+          if (opt.isCorrect) {
             levelPoints += 30;
             btn.classList.add("correct");
             qBox.classList.add("success");
@@ -167,8 +184,11 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
             qBox.classList.add("error");
           }
           Array.from(qBox.querySelectorAll(".option")).forEach(b => b.disabled = true);
+          answered++;
           updateTimerDisplay();
-          checkLevelComplete();
+          if (answered === qData.length && !levelFinished) {
+            finishLevel(true, "Level complete!");
+          }
         });
         qBox.appendChild(btn);
       });
@@ -177,7 +197,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     levelContent.appendChild(container);
   }
 
-  // Level 2: URL Verification
+  // Level 2: URL Verification (randomized, completes after all clicked)
   function renderUrlSpot() {
     const items = [
       { url: "https://accounts.school.edu/login", good: true },
@@ -186,10 +206,16 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       { url: "https://accounts.school.edu/login?redirect=https://evil.com", good: false },
       { url: "https://accounts.school.edu/login#auth", good: true }
     ];
+
+    shuffle(items);
+
     const container = document.createElement("div");
     container.innerHTML = `<p>Click the secure URL(s). Correct +20; wrong -15. Watch for subdomain tricks and redirects.</p>`;
     const grid = document.createElement("div");
     grid.className = "matchGrid";
+
+    let clicks = 0;
+
     items.forEach(it => {
       const card = document.createElement("div");
       card.className = "cardItem";
@@ -197,7 +223,8 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       btn.className = "option";
       btn.textContent = it.url;
       btn.addEventListener("click", () => {
-        if (btn.disabled) return;
+        if (btn.disabled || levelFinished) return;
+        clicks++;
         if (it.good) {
           levelPoints += 20;
           btn.classList.add("correct");
@@ -207,9 +234,11 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
           btn.classList.add("wrong");
           card.classList.add("error");
         }
-        Array.from(card.querySelectorAll(".option")).forEach(b => b.disabled = true);
+        btn.disabled = true;
         updateTimerDisplay();
-        checkLevelComplete();
+        if (clicks === items.length && !levelFinished) {
+          finishLevel(true, "Level complete!");
+        }
       });
       card.appendChild(btn);
       grid.appendChild(card);
@@ -218,7 +247,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     levelContent.appendChild(container);
   }
 
-  // Level 3: Drag & Drop Checklist (physical security)
+  // Level 3: Drag & Drop Checklist (physical security, randomized, completes when all dragged)
   function renderDragDrop() {
     const items = [
       "Lock screen when away",
@@ -230,11 +259,21 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       "Store backups in encrypted drives",
       "Label sensitive printouts with 'Confidential'"
     ];
-    const good = ["Lock screen when away", "Shred printed sensitive docs", "Use cable lock for laptop", "Store backups in encrypted drives"];
+    const good = [
+      "Lock screen when away",
+      "Shred printed sensitive docs",
+      "Use cable lock for laptop",
+      "Store backups in encrypted drives"
+    ];
+
+    shuffle(items);
+
     const container = document.createElement("div");
     container.innerHTML = `<p>Drag secure practices into the secure box. Correct +25, wrong -15.</p>`;
+
     const dragWrap = document.createElement("div");
     dragWrap.className = "dragArea";
+
     items.forEach(text => {
       const d = document.createElement("div");
       d.className = "draggable";
@@ -245,12 +284,14 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       });
       dragWrap.appendChild(d);
     });
+
     const drop = document.createElement("div");
     drop.className = "checklistDrop";
     drop.textContent = "Drop secure practices here";
     drop.addEventListener("dragover", e => e.preventDefault());
     drop.addEventListener("drop", e => {
       e.preventDefault();
+      if (levelFinished) return;
       const text = e.dataTransfer.getData("text/plain");
       if (!text) return;
       const node = document.createElement("div");
@@ -263,14 +304,17 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
         if (c.textContent === text) c.remove();
       });
       updateTimerDisplay();
-      checkLevelComplete();
+      if (dragWrap.children.length === 0 && !levelFinished) {
+        finishLevel(true, "Level complete!");
+      }
     });
+
     container.appendChild(dragWrap);
     container.appendChild(drop);
     levelContent.appendChild(container);
   }
 
-  // Level 4: Perimeter Match (expanded)
+  // Level 4: Perimeter Match (randomized, completes after all matches)
   function renderMatch() {
     const pairs = [
       { left: "6-foot chain-link fencing", right: "Deters casual intruders; preserves visibility" },
@@ -280,108 +324,169 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       { left: "Single monitored entrance", right: "Improves access control and visitor screening" },
       { left: "Clear zone adjacent to fence", right: "Prevents concealment and improves sightlines" }
     ];
-    const rightShuffled = pairs.map(p => p.right).sort(() => Math.random() - 0.5);
+
+    shuffle(pairs);
+    const rightShuffled = shuffle(pairs.map(p => p.right));
+
     const container = document.createElement("div");
     container.innerHTML = `<p>Click a left item, then its matching right item. Correct +30; wrong -15.</p>`;
+
     const gridL = document.createElement("div");
     gridL.className = "matchGrid";
+    const gridR = document.createElement("div");
+    gridR.className = "matchGrid";
+
     pairs.forEach((p, i) => {
       const left = document.createElement("div");
       left.className = "cardItem";
       left.innerHTML = `<strong>${p.left}</strong>`;
       left.dataset.idx = i;
-      left.addEventListener("click", () => selectLeft(left));
       gridL.appendChild(left);
     });
-    const gridR = document.createElement("div");
-    gridR.className = "matchGrid";
-    rightShuffled.forEach(r => {
+
+    rightShuffled.forEach((r, idx) => {
       const right = document.createElement("div");
       right.className = "cardItem";
       right.textContent = r;
-      right.addEventListener("click", () => selectRight(right));
+      right.dataset.right = r;
       gridR.appendChild(right);
     });
+
     container.appendChild(gridL);
     container.appendChild(gridR);
     levelContent.appendChild(container);
 
     let selectedLeft = null;
-    function selectLeft(el) {
-      Array.from(levelContent.querySelectorAll(".cardItem")).forEach(c => c.style.opacity = 1);
-      selectedLeft = el;
-      el.style.opacity = 0.6;
+    let matches = 0;
+
+    function clearSelection() {
+      Array.from(levelContent.querySelectorAll(".cardItem")).forEach(c => {
+        c.style.opacity = 1;
+      });
     }
-    function selectRight(el) {
-      if (!selectedLeft) return;
-      const leftText = selectedLeft.textContent.replace(/\s+/g, " ").trim();
-      const rightText = el.textContent;
-      const match = pairs.find(p => p.right === rightText && leftText.includes(p.left.split(" ")[0]));
-      if (match && leftText.includes(match.left.split(" ")[0])) {
+
+    gridL.addEventListener("click", e => {
+      if (levelFinished) return;
+      const card = e.target.closest(".cardItem");
+      if (!card || card.classList.contains("matched")) return;
+      selectedLeft = card;
+      clearSelection();
+      card.style.opacity = 0.6;
+    });
+
+    gridR.addEventListener("click", e => {
+      if (levelFinished) return;
+      const cardR = e.target.closest(".cardItem");
+      if (!cardR || cardR.classList.contains("matched") || !selectedLeft) return;
+
+      const leftIdx = Number(selectedLeft.dataset.idx);
+      const pair = pairs[leftIdx];
+      const rightText = cardR.textContent;
+
+      if (pair && pair.right === rightText) {
         levelPoints += 30;
-        selectedLeft.classList.add("success");
-        el.classList.add("success");
+        selectedLeft.classList.add("success", "matched");
+        cardR.classList.add("success", "matched");
+        matches++;
       } else {
         levelPoints -= 15;
         selectedLeft.classList.add("error");
-        el.classList.add("error");
+        cardR.classList.add("error");
       }
-      selectedLeft.removeEventListener("click", selectLeft);
-      el.removeEventListener("click", selectRight);
+
+      selectedLeft.style.opacity = 1;
       selectedLeft = null;
       updateTimerDisplay();
-      checkLevelComplete();
-    }
+
+      if (matches === pairs.length && !levelFinished) {
+        finishLevel(true, "Level complete!");
+      }
+    });
   }
 
-  // Level 5: Network Security (more prompts)
+  // Level 5: Network Security (randomized, completes after all answered)
   function renderNetwork() {
     const scenarios = [
       {
         prompt: "A router has default admin credentials. Best action?",
-        options: ["Leave as is for convenience", "Change to unique strong password and restrict admin access", "Disable admin access entirely"],
+        options: [
+          "Leave as is for convenience",
+          "Change to unique strong password and restrict admin access",
+          "Disable admin access entirely"
+        ],
         correct: 1
       },
       {
         prompt: "An open Wi‑Fi SSID with no encryption is discovered. Best immediate step?",
-        options: ["Ignore it", "Notify network admin and avoid connecting", "Connect and test throughput"],
+        options: [
+          "Ignore it",
+          "Notify network admin and avoid connecting",
+          "Connect and test throughput"
+        ],
         correct: 1
       },
       {
         prompt: "Firewall rule allows all inbound RDP to a server. Best remediation?",
-        options: ["Keep it; RDP is needed", "Restrict RDP to specific IPs and enable MFA", "Move server to DMZ without changes"],
+        options: [
+          "Keep it; RDP is needed",
+          "Restrict RDP to specific IPs and enable MFA",
+          "Move server to DMZ without changes"
+        ],
         correct: 1
       },
       {
         prompt: "You find an unmanaged switch in a wiring closet. Best practice?",
-        options: ["Leave it connected", "Label, inventory, and restrict physical access; document configuration", "Use it for temporary guest access"],
+        options: [
+          "Leave it connected",
+          "Label, inventory, and restrict physical access; document configuration",
+          "Use it for temporary guest access"
+        ],
         correct: 1
       },
       {
         prompt: "A server shows unusual outbound traffic to unknown IPs. First technical step?",
-        options: ["Block outbound traffic and capture PCAP for analysis", "Reboot server immediately", "Disable logging to reduce noise"],
+        options: [
+          "Block outbound traffic and capture PCAP for analysis",
+          "Reboot server immediately",
+          "Disable logging to reduce noise"
+        ],
         correct: 0
       },
       {
         prompt: "Which practice reduces risk from exposed management interfaces?",
-        options: ["Expose interfaces to the internet for convenience", "Use jump hosts, restrict by IP, and enable MFA", "Use default ports and credentials"],
+        options: [
+          "Expose interfaces to the internet for convenience",
+          "Use jump hosts, restrict by IP, and enable MFA",
+          "Use default ports and credentials"
+        ],
         correct: 1
       }
     ];
+
     const container = document.createElement("div");
     container.innerHTML = `<p>Choose the most secure technical action. Correct +35; wrong -20.</p>`;
+
+    let answered = 0;
+
     scenarios.forEach((s, i) => {
       const box = document.createElement("div");
       box.className = "cardItem";
       box.style.textAlign = "left";
       box.innerHTML = `<strong>Scenario ${i+1}.</strong> ${s.prompt}`;
-      s.options.forEach((opt, idx) => {
+
+      const opts = s.options.map((text, idx) => ({
+        text,
+        isCorrect: idx === s.correct
+      }));
+      shuffle(opts);
+
+      opts.forEach(opt => {
         const btn = document.createElement("button");
         btn.className = "option";
-        btn.textContent = opt;
+        btn.textContent = opt.text;
         btn.addEventListener("click", () => {
-          if (btn.disabled) return;
-          if (idx === s.correct) {
+          if (btn.disabled || levelFinished) return;
+          if (opt.isCorrect) {
             levelPoints += 35;
             btn.classList.add("correct");
             box.classList.add("success");
@@ -391,17 +496,22 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
             box.classList.add("error");
           }
           Array.from(box.querySelectorAll(".option")).forEach(b => b.disabled = true);
+          answered++;
           updateTimerDisplay();
-          checkLevelComplete();
+          if (answered === scenarios.length && !levelFinished) {
+            finishLevel(true, "Level complete!");
+          }
         });
         box.appendChild(btn);
       });
+
       container.appendChild(box);
     });
+
     levelContent.appendChild(container);
   }
 
-  // Level 6: Incident Response — extended steps and ordering
+  // Level 6: Incident Response — randomized, fixed click, completes on submit
   function renderIncident() {
     const tasks = [
       "Isolate affected systems",
@@ -414,32 +524,44 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       "Remediate and validate systems before restore",
       "Document lessons learned and update playbooks"
     ];
+
+    shuffle(tasks);
+
     const container = document.createElement("div");
     container.innerHTML = `<p>Select and order the first five actions for a suspected breach. Correct selections +40 each; correct order bonus +80.</p>`;
+
     const optionsWrap = document.createElement("div");
     optionsWrap.className = "matchGrid";
+
+    const chosenWrap = document.createElement("div");
+    chosenWrap.className = "chosenWrap";
+    chosenWrap.style.marginTop = "0.6rem";
+
     tasks.forEach(t => {
       const b = document.createElement("div");
       b.className = "cardItem";
       b.textContent = t;
       b.addEventListener("click", () => {
-        if (b.dataset.chosen) return;
-        const order = container.querySelectorAll(".chosen").length + 1;
+        if (b.dataset.chosen || levelFinished) return;
+        const order = chosenWrap.querySelectorAll(".chosen").length + 1;
+        if (order > 5) return;
         const chosen = document.createElement("div");
         chosen.className = "cardItem chosen";
         chosen.textContent = `${order}. ${t}`;
-        container.appendChild(chosen);
+        chosenWrap.appendChild(chosen);
         b.dataset.chosen = "1";
       });
       optionsWrap.appendChild(b);
     });
+
     const submit = document.createElement("div");
     submit.style.marginTop = "0.6rem";
     const sbtn = document.createElement("button");
     sbtn.className = "btn";
     sbtn.textContent = "Submit Incident Plan";
     sbtn.addEventListener("click", () => {
-      const chosenEls = Array.from(container.querySelectorAll(".chosen"));
+      if (levelFinished) return;
+      const chosenEls = Array.from(chosenWrap.querySelectorAll(".chosen"));
       const chosen = chosenEls.map(e => e.textContent.replace(/^\d+\.\s*/, ""));
       const required = [
         "Isolate affected systems",
@@ -461,27 +583,22 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       const wrong = 5 - correctCount;
       levelPoints -= wrong * 25;
       updateTimerDisplay();
-      checkLevelComplete();
+      if (!levelFinished) {
+        finishLevel(true, "Level complete!");
+      }
     });
     submit.appendChild(sbtn);
+
     levelContent.appendChild(optionsWrap);
+    levelContent.appendChild(chosenWrap);
     levelContent.appendChild(submit);
   }
 
   /* ---------- Level completion and navigation ---------- */
 
-  function checkLevelComplete() {
-    setTimeout(() => {
-      if (levelPoints >= 120 || timeLeft < 8) {
-        finishLevel(true, "Level complete!");
-      } else {
-        if (levelPoints > 0) nextLevelBtn.disabled = false;
-      }
-      updateUI();
-    }, 250);
-  }
-
   function finishLevel(success, message) {
+    if (levelFinished) return;
+    levelFinished = true;
     clearInterval(timerInterval);
     const bonus = Math.max(0, Math.floor(timeLeft / 4));
     const totalGain = Math.max(0, levelPoints) + (success ? bonus : 0);
@@ -520,13 +637,16 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     lobby.classList.add("hidden");
     finalText.textContent = `Your final score is ${score} points.`;
     badgesWrap.innerHTML = "";
-    if (badges.size === 0) badgesWrap.textContent = "No badges earned. Try for perfect rounds!";
-    else badges.forEach(b => {
-      const el = document.createElement("div");
-      el.className = "badge";
-      el.textContent = b;
-      badgesWrap.appendChild(el);
-    });
+    if (badges.size === 0) {
+      badgesWrap.textContent = "No badges earned. Try for perfect rounds!";
+    } else {
+      badges.forEach(b => {
+        const el = document.createElement("div");
+        el.className = "badge";
+        el.textContent = b;
+        badgesWrap.appendChild(el);
+      });
+    }
     if (score >= 400) {
       const champ = document.createElement("div");
       champ.className = "badge";
@@ -541,6 +661,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     score = 0;
     current = 0;
     levelPoints = 0;
+    levelFinished = false;
     badges.clear();
     clearInterval(timerInterval);
     lobby.classList.remove("hidden");
@@ -552,7 +673,6 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
   }
 
   updateUI();
-
   /* ========== Leaderboard integration (lobby only) ========== */
 
   // Basic username rules
@@ -565,16 +685,31 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
   }
 
   // Escape HTML
-  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;',
+      '<':'&lt;',
+      '>':'&gt;',
+      '"':'&quot;',
+      "'":'&#39;'
+    }[c]));
+  }
 
   // Local storage helpers
   const LOCAL_KEY = "securityQuest_localLeaderboard_v1";
+
   function saveLocalScore(name, scoreVal, level) {
     const list = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
-    list.push({ name, score: Number(scoreVal) || 0, level, timestamp: new Date().toISOString() });
+    list.push({
+      name,
+      score: Number(scoreVal) || 0,
+      level,
+      timestamp: new Date().toISOString()
+    });
     list.sort((a,b) => b.score - a.score);
     localStorage.setItem(LOCAL_KEY, JSON.stringify(list.slice(0, 100)));
   }
+
   function loadLocalScores(limit=10) {
     return JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]").slice(0, limit);
   }
@@ -628,9 +763,11 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     rows.slice(0, limit).forEach((r, i) => {
       const item = document.createElement("div");
       item.className = "cardItem";
-      item.innerHTML = `<strong>#${i+1} ${escapeHtml(r.name)}</strong>
-                        <div>Score: ${r.score} — ${escapeHtml(r.level || "")}</div>
-                        <div class="muted">${new Date(r.timestamp).toLocaleString()}</div>`;
+      item.innerHTML = `
+        <strong>#${i+1} ${escapeHtml(r.name)}</strong>
+        <div>Score: ${r.score} — ${escapeHtml(r.level || "")}</div>
+        <div class="muted">${new Date(r.timestamp).toLocaleString()}</div>
+      `;
       listEl.appendChild(item);
     });
   }
@@ -642,12 +779,17 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     const rawName = nameInput.value.trim();
     const privacy = privacySelect.value;
     const name = privacy === "anonymous" ? "Anonymous" : rawName;
+
     if (privacy !== "anonymous" && !validUsername(rawName)) {
       msgEl.textContent = "Username must be 2–20 characters and use letters, numbers, spaces, - or _.";
       return;
     }
-    const finalScore = (typeof window.totalGameScore !== "undefined") ? window.totalGameScore : (typeof score !== "undefined" ? score : 0);
-    const level = `Final`;
+
+    const finalScore = (typeof window.totalGameScore !== "undefined")
+      ? window.totalGameScore
+      : (typeof score !== "undefined" ? score : 0);
+
+    const level = "Final";
     msgEl.textContent = "Submitting...";
     const res = await submitScoreToBackend(name, finalScore, level);
     if (res && (res.status === "ok" || res.source === "local")) {
