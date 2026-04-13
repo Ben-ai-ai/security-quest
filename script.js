@@ -1,7 +1,5 @@
 /* ========== Configuration ========== */
-// If you deploy a backend (Apps Script), paste its URL here.
-// Leave empty to use localStorage fallback.
-const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKfy.../exec"
+const LEADERBOARD_ENDPOINT = "";
 
 /* ========== Game state and DOM refs ========== */
 (() => {
@@ -19,15 +17,17 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
   let levelPoints = 0;
   let timerInterval = null;
   let timeLeft = 0;
-  let levelFinished = false;
+
+  // 🔥 GLOBAL FIX: always use this instead of closure-broken levelFinished
+  window._levelFinished = false;
+
   const badges = new Set();
 
-  // Simple array shuffle
   function shuffle(arr) {
     return arr.sort(() => Math.random() - 0.5);
   }
 
-  // DOM
+  // DOM refs
   const levelsEl = document.getElementById("levels");
   const startAll = document.getElementById("startAll");
   const resetGame = document.getElementById("resetGame");
@@ -46,7 +46,6 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
   const badgesWrap = document.getElementById("badges");
   const playAgain = document.getElementById("playAgain");
 
-  // Leaderboard DOM refs (lobby only)
   const panel = document.getElementById("leaderboardPanel");
   const submitBtn = document.getElementById("submitScoreBtn");
   const refreshBtn = document.getElementById("refreshLeaderboard");
@@ -55,13 +54,11 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
   const listEl = document.getElementById("leaderboardList");
   const msgEl = document.getElementById("leaderboardMsg");
 
-  // expose helper for game to set final score before submit
   window.securityQuest = window.securityQuest || {};
   window.securityQuest.setFinalScore = function(value) {
     window.totalGameScore = Number(value) || 0;
   };
 
-  // create level buttons
   LEVELS.forEach(l => {
     const btn = document.createElement("button");
     btn.className = "levelBtn";
@@ -80,13 +77,16 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
   function startLevel(id) {
     current = id;
     levelPoints = 0;
-    levelFinished = false;
-    // hide lobby and leaderboard panel
+
+    // 🔥 FIX: reset global flag
+    window._levelFinished = false;
+
     lobby.classList.add("hidden");
     panel.classList.add("hidden");
     gameArea.classList.remove("hidden");
     finalSection.classList.add("hidden");
     nextLevelBtn.disabled = true;
+
     renderLevel();
     updateUI();
   }
@@ -97,6 +97,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     levelContent.innerHTML = "";
     timeLeft = 90 + (6 - level.id) * 12;
     startTimer();
+
     if (level.type === "quiz") renderAdvancedQuiz();
     if (level.type === "urlspot") renderUrlSpot();
     if (level.type === "dragdrop") renderDragDrop();
@@ -111,7 +112,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     timerInterval = setInterval(() => {
       timeLeft--;
       updateTimerDisplay();
-      if (timeLeft <= 0 && !levelFinished) {
+      if (timeLeft <= 0 && !window._levelFinished) {
         clearInterval(timerInterval);
         finishLevel(false, "Time's up!");
       }
@@ -125,9 +126,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     levelPointsEl.textContent = `Level Points: ${levelPoints}`;
   }
 
-  /* ---------- Level implementations ---------- */
-
-  // Level 1: Advanced Site Security Quiz (with randomized options)
+  /* ---------- LEVEL 1 ---------- */
   function renderAdvancedQuiz() {
     const qData = [
       {
@@ -161,7 +160,6 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       qBox.style.textAlign = "left";
       qBox.innerHTML = `<strong>Q${i+1}.</strong> ${q.q}`;
 
-      // build option objects and shuffle
       const options = q.a.map((text, idx) => ({
         text,
         isCorrect: idx === q.correct
@@ -173,7 +171,8 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
         btn.className = "option";
         btn.textContent = opt.text;
         btn.addEventListener("click", () => {
-          if (btn.disabled || levelFinished) return;
+          if (btn.disabled || window._levelFinished) return;
+
           if (opt.isCorrect) {
             levelPoints += 30;
             btn.classList.add("correct");
@@ -183,21 +182,25 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
             btn.classList.add("wrong");
             qBox.classList.add("error");
           }
+
           Array.from(qBox.querySelectorAll(".option")).forEach(b => b.disabled = true);
           answered++;
           updateTimerDisplay();
-          if (answered === qData.length && !levelFinished) {
+
+          if (answered === qData.length && !window._levelFinished) {
             finishLevel(true, "Level complete!");
           }
         });
         qBox.appendChild(btn);
       });
+
       container.appendChild(qBox);
     });
+
     levelContent.appendChild(container);
   }
 
-  // Level 2: URL Verification (randomized, completes after all clicked)
+  /* ---------- LEVEL 2 ---------- */
   function renderUrlSpot() {
     const items = [
       { url: "https://accounts.school.edu/login", good: true },
@@ -210,7 +213,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     shuffle(items);
 
     const container = document.createElement("div");
-    container.innerHTML = `<p>Click the secure URL(s). Correct +20; wrong -15. Watch for subdomain tricks and redirects.</p>`;
+    container.innerHTML = `<p>Click the secure URL(s). Correct +20; wrong -15.</p>`;
     const grid = document.createElement("div");
     grid.className = "matchGrid";
 
@@ -219,12 +222,16 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     items.forEach(it => {
       const card = document.createElement("div");
       card.className = "cardItem";
+
       const btn = document.createElement("button");
       btn.className = "option";
       btn.textContent = it.url;
+
       btn.addEventListener("click", () => {
-        if (btn.disabled || levelFinished) return;
+        if (btn.disabled || window._levelFinished) return;
+
         clicks++;
+
         if (it.good) {
           levelPoints += 20;
           btn.classList.add("correct");
@@ -234,20 +241,24 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
           btn.classList.add("wrong");
           card.classList.add("error");
         }
+
         btn.disabled = true;
         updateTimerDisplay();
-        if (clicks === items.length && !levelFinished) {
+
+        if (clicks === items.length && !window._levelFinished) {
           finishLevel(true, "Level complete!");
         }
       });
+
       card.appendChild(btn);
       grid.appendChild(card);
     });
+
     container.appendChild(grid);
     levelContent.appendChild(container);
   }
 
-  // Level 3: Drag & Drop Checklist (physical security, randomized, completes when all dragged)
+  /* ---------- LEVEL 3 ---------- */
   function renderDragDrop() {
     const items = [
       "Lock screen when away",
@@ -259,6 +270,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       "Store backups in encrypted drives",
       "Label sensitive printouts with 'Confidential'"
     ];
+
     const good = [
       "Lock screen when away",
       "Shred printed sensitive docs",
@@ -279,32 +291,42 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       d.className = "draggable";
       d.draggable = true;
       d.textContent = text;
+
       d.addEventListener("dragstart", e => {
         e.dataTransfer.setData("text/plain", text);
       });
+
       dragWrap.appendChild(d);
     });
 
     const drop = document.createElement("div");
     drop.className = "checklistDrop";
     drop.textContent = "Drop secure practices here";
+
     drop.addEventListener("dragover", e => e.preventDefault());
+
     drop.addEventListener("drop", e => {
       e.preventDefault();
-      if (levelFinished) return;
+      if (window._levelFinished) return;
+
       const text = e.dataTransfer.getData("text/plain");
       if (!text) return;
+
       const node = document.createElement("div");
       node.className = "cardItem";
       node.textContent = text;
       drop.appendChild(node);
+
       if (good.includes(text)) levelPoints += 25;
       else levelPoints -= 15;
+
       Array.from(dragWrap.children).forEach(c => {
         if (c.textContent === text) c.remove();
       });
+
       updateTimerDisplay();
-      if (dragWrap.children.length === 0 && !levelFinished) {
+
+      if (dragWrap.children.length === 0 && !window._levelFinished) {
         finishLevel(true, "Level complete!");
       }
     });
@@ -313,8 +335,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     container.appendChild(drop);
     levelContent.appendChild(container);
   }
-
-  // Level 4: Perimeter Match (randomized, completes after all matches)
+  /* ---------- LEVEL 4 ---------- */
   function renderMatch() {
     const pairs = [
       { left: "6-foot chain-link fencing", right: "Deters casual intruders; preserves visibility" },
@@ -333,6 +354,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
 
     const gridL = document.createElement("div");
     gridL.className = "matchGrid";
+
     const gridR = document.createElement("div");
     gridR.className = "matchGrid";
 
@@ -344,11 +366,10 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       gridL.appendChild(left);
     });
 
-    rightShuffled.forEach((r, idx) => {
+    rightShuffled.forEach(r => {
       const right = document.createElement("div");
       right.className = "cardItem";
       right.textContent = r;
-      right.dataset.right = r;
       gridR.appendChild(right);
     });
 
@@ -359,31 +380,31 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
     let selectedLeft = null;
     let matches = 0;
 
-    function clearSelection() {
+    gridL.addEventListener("click", e => {
+      if (window._levelFinished) return;
+
+      const card = e.target.closest(".cardItem");
+      if (!card || card.classList.contains("matched")) return;
+
+      selectedLeft = card;
+
       Array.from(levelContent.querySelectorAll(".cardItem")).forEach(c => {
         c.style.opacity = 1;
       });
-    }
 
-    gridL.addEventListener("click", e => {
-      if (levelFinished) return;
-      const card = e.target.closest(".cardItem");
-      if (!card || card.classList.contains("matched")) return;
-      selectedLeft = card;
-      clearSelection();
       card.style.opacity = 0.6;
     });
 
     gridR.addEventListener("click", e => {
-      if (levelFinished) return;
+      if (window._levelFinished) return;
+
       const cardR = e.target.closest(".cardItem");
       if (!cardR || cardR.classList.contains("matched") || !selectedLeft) return;
 
       const leftIdx = Number(selectedLeft.dataset.idx);
       const pair = pairs[leftIdx];
-      const rightText = cardR.textContent;
 
-      if (pair && pair.right === rightText) {
+      if (pair.right === cardR.textContent) {
         levelPoints += 30;
         selectedLeft.classList.add("success", "matched");
         cardR.classList.add("success", "matched");
@@ -398,13 +419,13 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
       selectedLeft = null;
       updateTimerDisplay();
 
-      if (matches === pairs.length && !levelFinished) {
+      if (matches === pairs.length && !window._levelFinished) {
         finishLevel(true, "Level complete!");
       }
     });
   }
 
-  // Level 5: Network Security (randomized, completes after all answered)
+  /* ---------- LEVEL 5 ---------- */
   function renderNetwork() {
     const scenarios = [
       {
@@ -484,8 +505,10 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
         const btn = document.createElement("button");
         btn.className = "option";
         btn.textContent = opt.text;
+
         btn.addEventListener("click", () => {
-          if (btn.disabled || levelFinished) return;
+          if (btn.disabled || window._levelFinished) return;
+
           if (opt.isCorrect) {
             levelPoints += 35;
             btn.classList.add("correct");
@@ -495,312 +518,7 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
             btn.classList.add("wrong");
             box.classList.add("error");
           }
+
           Array.from(box.querySelectorAll(".option")).forEach(b => b.disabled = true);
           answered++;
-          updateTimerDisplay();
-          if (answered === scenarios.length && !levelFinished) {
-            finishLevel(true, "Level complete!");
-          }
-        });
-        box.appendChild(btn);
-      });
-
-      container.appendChild(box);
-    });
-
-    levelContent.appendChild(container);
-  }
-
-  // Level 6: Incident Response — randomized, fixed click, completes on submit
-  function renderIncident() {
-    const tasks = [
-      "Isolate affected systems",
-      "Preserve logs and evidence",
-      "Identify scope and affected assets",
-      "Notify incident response team",
-      "Apply temporary mitigations",
-      "Communicate to stakeholders with approved messaging",
-      "Perform root cause analysis",
-      "Remediate and validate systems before restore",
-      "Document lessons learned and update playbooks"
-    ];
-
-    shuffle(tasks);
-
-    const container = document.createElement("div");
-    container.innerHTML = `<p>Select and order the first five actions for a suspected breach. Correct selections +40 each; correct order bonus +80.</p>`;
-
-    const optionsWrap = document.createElement("div");
-    optionsWrap.className = "matchGrid";
-
-    const chosenWrap = document.createElement("div");
-    chosenWrap.className = "chosenWrap";
-    chosenWrap.style.marginTop = "0.6rem";
-
-    tasks.forEach(t => {
-      const b = document.createElement("div");
-      b.className = "cardItem";
-      b.textContent = t;
-      b.addEventListener("click", () => {
-        if (b.dataset.chosen || levelFinished) return;
-        const order = chosenWrap.querySelectorAll(".chosen").length + 1;
-        if (order > 5) return;
-        const chosen = document.createElement("div");
-        chosen.className = "cardItem chosen";
-        chosen.textContent = `${order}. ${t}`;
-        chosenWrap.appendChild(chosen);
-        b.dataset.chosen = "1";
-      });
-      optionsWrap.appendChild(b);
-    });
-
-    const submit = document.createElement("div");
-    submit.style.marginTop = "0.6rem";
-    const sbtn = document.createElement("button");
-    sbtn.className = "btn";
-    sbtn.textContent = "Submit Incident Plan";
-    sbtn.addEventListener("click", () => {
-      if (levelFinished) return;
-      const chosenEls = Array.from(chosenWrap.querySelectorAll(".chosen"));
-      const chosen = chosenEls.map(e => e.textContent.replace(/^\d+\.\s*/, ""));
-      const required = [
-        "Isolate affected systems",
-        "Preserve logs and evidence",
-        "Identify scope and affected assets",
-        "Notify incident response team",
-        "Apply temporary mitigations"
-      ];
-      let correctCount = 0;
-      chosen.slice(0, 5).forEach(c => {
-        if (required.includes(c)) correctCount++;
-      });
-      levelPoints += correctCount * 40;
-      const chosenFirstFive = chosen.slice(0, 5);
-      if (chosenFirstFive.length === 5 && chosenFirstFive.every((v, i) => v === required[i])) {
-        levelPoints += 80;
-        badges.add("IR Specialist");
-      }
-      const wrong = 5 - correctCount;
-      levelPoints -= wrong * 25;
-      updateTimerDisplay();
-      if (!levelFinished) {
-        finishLevel(true, "Level complete!");
-      }
-    });
-    submit.appendChild(sbtn);
-
-    levelContent.appendChild(optionsWrap);
-    levelContent.appendChild(chosenWrap);
-    levelContent.appendChild(submit);
-  }
-
-  /* ---------- Level completion and navigation ---------- */
-
-  function finishLevel(success, message) {
-    if (levelFinished) return;
-    levelFinished = true;
-    clearInterval(timerInterval);
-    const bonus = Math.max(0, Math.floor(timeLeft / 4));
-    const totalGain = Math.max(0, levelPoints) + (success ? bonus : 0);
-    score += totalGain;
-    if (levelPoints >= 150) badges.add(`Level${current} Ace`);
-    updateUI();
-    levelContent.innerHTML = `<div class="result">${message} You earned ${totalGain} points this level.</div>`;
-    nextLevelBtn.disabled = false;
-    if (current === LEVELS.length) nextLevelBtn.textContent = "Finish Game";
-    else nextLevelBtn.textContent = "Next Level";
-  }
-
-  nextLevelBtn.addEventListener("click", () => {
-    if (current === LEVELS.length) {
-      showFinal();
-    } else {
-      startLevel(current + 1);
-    }
-  });
-
-  backToLobby.addEventListener("click", () => {
-    clearInterval(timerInterval);
-    gameArea.classList.add("hidden");
-    lobby.classList.remove("hidden");
-    panel.classList.remove("hidden"); // show leaderboard again
-  });
-
-  startAll.addEventListener("click", () => startLevel(1));
-  resetGame.addEventListener("click", resetAll);
-  playAgain.addEventListener("click", resetAll);
-
-  function showFinal() {
-    clearInterval(timerInterval);
-    gameArea.classList.add("hidden");
-    finalSection.classList.remove("hidden");
-    lobby.classList.add("hidden");
-    finalText.textContent = `Your final score is ${score} points.`;
-    badgesWrap.innerHTML = "";
-    if (badges.size === 0) {
-      badgesWrap.textContent = "No badges earned. Try for perfect rounds!";
-    } else {
-      badges.forEach(b => {
-        const el = document.createElement("div");
-        el.className = "badge";
-        el.textContent = b;
-        badgesWrap.appendChild(el);
-      });
-    }
-    if (score >= 400) {
-      const champ = document.createElement("div");
-      champ.className = "badge";
-      champ.textContent = "Security Champion";
-      badgesWrap.appendChild(champ);
-    }
-    // set final score for leaderboard submission
-    window.securityQuest.setFinalScore(score);
-  }
-
-  function resetAll() {
-    score = 0;
-    current = 0;
-    levelPoints = 0;
-    levelFinished = false;
-    badges.clear();
-    clearInterval(timerInterval);
-    lobby.classList.remove("hidden");
-    panel.classList.remove("hidden"); // ensure leaderboard visible
-    gameArea.classList.add("hidden");
-    finalSection.classList.add("hidden");
-    updateUI();
-    renderLeaderboard(); // refresh lobby leaderboard
-  }
-
-  updateUI();
-  /* ========== Leaderboard integration (lobby only) ========== */
-
-  // Basic username rules
-  function validUsername(name) {
-    if (!name) return false;
-    const trimmed = name.trim();
-    if (trimmed.length < 2 || trimmed.length > 20) return false;
-    const re = /^[A-Za-z0-9_\- ]+$/;
-    return re.test(trimmed);
-  }
-
-  // Escape HTML
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, c => ({
-      '&':'&amp;',
-      '<':'&lt;',
-      '>':'&gt;',
-      '"':'&quot;',
-      "'":'&#39;'
-    }[c]));
-  }
-
-  // Local storage helpers
-  const LOCAL_KEY = "securityQuest_localLeaderboard_v1";
-
-  function saveLocalScore(name, scoreVal, level) {
-    const list = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
-    list.push({
-      name,
-      score: Number(scoreVal) || 0,
-      level,
-      timestamp: new Date().toISOString()
-    });
-    list.sort((a,b) => b.score - a.score);
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(list.slice(0, 100)));
-  }
-
-  function loadLocalScores(limit=10) {
-    return JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]").slice(0, limit);
-  }
-
-  // Backend functions
-  async function fetchLeaderboard(limit=10) {
-    if (!LEADERBOARD_ENDPOINT) return loadLocalScores(limit);
-    try {
-      const url = `${LEADERBOARD_ENDPOINT}?action=leaderboard&limit=${limit}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Network error");
-      const data = await res.json();
-      return data.leaderboard || [];
-    } catch (err) {
-      console.warn("Leaderboard fetch failed, using local fallback", err);
-      return loadLocalScores(limit);
-    }
-  }
-
-  async function submitScoreToBackend(name, scoreVal, level='Final') {
-    if (!LEADERBOARD_ENDPOINT) {
-      saveLocalScore(name, scoreVal, level);
-      return { status: "ok", source: "local" };
-    }
-    try {
-      const payload = { name, score: Number(scoreVal) || 0, level };
-      const res = await fetch(LEADERBOARD_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      return data;
-    } catch (err) {
-      console.warn("Submit failed, saving locally", err);
-      saveLocalScore(name, scoreVal, level);
-      return { status: "ok", source: "local" };
-    }
-  }
-
-  // Render leaderboard (lobby)
-  async function renderLeaderboard(limit=6) {
-    listEl.innerHTML = "";
-    msgEl.textContent = "Loading...";
-    const rows = await fetchLeaderboard(limit);
-    if (!rows || rows.length === 0) {
-      msgEl.textContent = "No scores yet — be the first!";
-      return;
-    }
-    msgEl.textContent = "";
-    rows.slice(0, limit).forEach((r, i) => {
-      const item = document.createElement("div");
-      item.className = "cardItem";
-      item.innerHTML = `
-        <strong>#${i+1} ${escapeHtml(r.name)}</strong>
-        <div>Score: ${r.score} — ${escapeHtml(r.level || "")}</div>
-        <div class="muted">${new Date(r.timestamp).toLocaleString()}</div>
-      `;
-      listEl.appendChild(item);
-    });
-  }
-
-  // UI wiring for leaderboard (lobby)
-  refreshBtn.addEventListener("click", () => renderLeaderboard());
-
-  submitBtn.addEventListener("click", async () => {
-    const rawName = nameInput.value.trim();
-    const privacy = privacySelect.value;
-    const name = privacy === "anonymous" ? "Anonymous" : rawName;
-
-    if (privacy !== "anonymous" && !validUsername(rawName)) {
-      msgEl.textContent = "Username must be 2–20 characters and use letters, numbers, spaces, - or _.";
-      return;
-    }
-
-    const finalScore = (typeof window.totalGameScore !== "undefined")
-      ? window.totalGameScore
-      : (typeof score !== "undefined" ? score : 0);
-
-    const level = "Final";
-    msgEl.textContent = "Submitting...";
-    const res = await submitScoreToBackend(name, finalScore, level);
-    if (res && (res.status === "ok" || res.source === "local")) {
-      msgEl.textContent = "Score submitted!";
-      renderLeaderboard();
-    } else {
-      msgEl.textContent = "Submission failed.";
-    }
-  });
-
-  // initial render of leaderboard (lobby)
-  renderLeaderboard();
-
-})();
+          update
