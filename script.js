@@ -139,11 +139,6 @@ const LEADERBOARD_ENDPOINT = ""; // e.g. "https://script.google.com/macros/s/AKf
         correct: 1
       },
       {
-        q: "Which header helps enforce HTTPS for a site?",
-        a: ["Content-Security-Policy", "X-Frame-Options", "Strict-Transport-Security"],
-        correct: 2
-      },
-      {
         q: "Best way to store secrets for an application?",
         a: ["Hard-code in source with access control", "Use a secrets manager with least privilege", "Store in a public repo but obfuscate"],
         correct: 1
