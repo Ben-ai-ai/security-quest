@@ -521,4 +521,158 @@ const LEADERBOARD_ENDPOINT = "";
 
           Array.from(box.querySelectorAll(".option")).forEach(b => b.disabled = true);
           answered++;
-          update
+          updateTimerDisplay(); // <--- This completes your cut-off line
+
+          if (answered === scenarios.length && !window._levelFinished) {
+            finishLevel(true, "Level complete!");
+          }
+        });
+        box.appendChild(btn);
+      });
+      container.appendChild(box);
+    });
+
+    levelContent.appendChild(container);
+  }
+
+  /* ---------- LEVEL 6: INCIDENT RESPONSE ---------- */
+  function renderIncident() {
+    const scenarios = [
+      {
+        prompt: "A ransomware infection is actively spreading. First action?",
+        options: ["Pay the ransom immediately", "Isolate infected systems from the network", "Reboot the servers"],
+        correct: 1
+      },
+      {
+         prompt: "A user reports clicking a phishing link. First action?",
+         options: ["Tell them to be careful next time", "Reset their credentials and review logs", "Delete the email from their inbox"],
+         correct: 1
+      }
+    ];
+
+    const container = document.createElement("div");
+    container.innerHTML = `<p>Choose the best incident response action. Correct +40; wrong -20.</p>`;
+    let answered = 0;
+
+    scenarios.forEach((s, i) => {
+      const box = document.createElement("div");
+      box.className = "cardItem";
+      box.style.textAlign = "left";
+      box.innerHTML = `<strong>Scenario ${i+1}.</strong> ${s.prompt}`;
+
+      const opts = s.options.map((text, idx) => ({ text, isCorrect: idx === s.correct }));
+      shuffle(opts);
+
+      opts.forEach(opt => {
+        const btn = document.createElement("button");
+        btn.className = "option";
+        btn.textContent = opt.text;
+
+        btn.addEventListener("click", () => {
+          if (btn.disabled || window._levelFinished) return;
+          
+          if (opt.isCorrect) { 
+             levelPoints += 40; 
+             btn.classList.add("correct"); 
+             box.classList.add("success"); 
+          } else { 
+             levelPoints -= 20; 
+             btn.classList.add("wrong"); 
+             box.classList.add("error"); 
+          }
+
+          Array.from(box.querySelectorAll(".option")).forEach(b => b.disabled = true);
+          answered++;
+          updateTimerDisplay();
+
+          if (answered === scenarios.length && !window._levelFinished) {
+            finishLevel(true, "Level complete!");
+          }
+        });
+        box.appendChild(btn);
+      });
+      container.appendChild(box);
+    });
+    levelContent.appendChild(container);
+  }
+
+  /* ---------- GAME ENGINE LOGIC ---------- */
+  function finishLevel(success, msg) {
+    window._levelFinished = true;
+    clearInterval(timerInterval);
+
+    if (success) {
+      levelPoints += timeLeft * 2; // Time bonus
+      score += levelPoints;
+      badges.add(`Lvl ${current} Cleared`);
+    }
+
+    finalText.textContent = `${msg} You scored ${levelPoints} points this round.`;
+    gameArea.classList.add("hidden");
+    finalSection.classList.remove("hidden");
+    updateUI();
+
+    if (current >= LEVELS.length) {
+      nextLevelBtn.disabled = true;
+      finalText.innerHTML += `<br><br><strong>Game Over! Total Score: ${score}</strong>`;
+      window.securityQuest.setFinalScore(score);
+    } else {
+      nextLevelBtn.disabled = !success;
+    }
+  }
+
+  /* ---------- BUTTON EVENT LISTENERS ---------- */
+  startAll.addEventListener("click", () => startLevel(1));
+
+  resetGame.addEventListener("click", () => {
+    score = 0;
+    badges.clear();
+    updateUI();
+  });
+
+  nextLevelBtn.addEventListener("click", () => {
+    if (current < LEVELS.length) startLevel(current + 1);
+  });
+
+  backToLobby.addEventListener("click", () => {
+    gameArea.classList.add("hidden");
+    finalSection.classList.add("hidden");
+    lobby.classList.remove("hidden");
+    panel.classList.remove("hidden");
+  });
+
+  playAgain.addEventListener("click", () => {
+    finalSection.classList.add("hidden");
+    lobby.classList.remove("hidden");
+    panel.classList.remove("hidden");
+  });
+
+  /* ---------- LEADERBOARD LOGIC ---------- */
+  refreshBtn.addEventListener("click", () => {
+    msgEl.textContent = "Leaderboard refreshed!";
+    msgEl.style.color = "var(--success)";
+  });
+
+  submitBtn.addEventListener("click", () => {
+    if (score === 0) {
+       msgEl.textContent = "Play a level to get a score first!";
+       msgEl.style.color = "var(--danger)";
+       return;
+    }
+    const name = nameInput.value.trim() || "Anonymous";
+    const privacy = privacySelect.value;
+    const displayName = privacy === "anonymous" ? "Anonymous" : name;
+
+    // Build the visual entry
+    const entry = document.createElement("div");
+    entry.className = "cardItem success";
+    entry.innerHTML = `<strong>${displayName}</strong><span>Score: ${score}</span>`;
+    listEl.prepend(entry);
+
+    msgEl.textContent = `Score submitted for ${displayName}!`;
+    msgEl.style.color = "var(--success)";
+  });
+
+  // Initialize UI on load
+  updateUI();
+})();
